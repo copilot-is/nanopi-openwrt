@@ -33,17 +33,6 @@ index 55cd519..06d202c 100755
  		ethtool -K $c gso on >/dev/null 2>&1
  		ethtool -K $c tso on >/dev/null 2>&1
  		ethtool -K $c ufo on >/dev/null 2>&1
-diff --git a/package/lean/autocore/files/index.htm b/package/lean/autocore/files/index.htm
-index 22d1a55..0198c38 100644
---- a/package/lean/autocore/files/index.htm
-+++ b/package/lean/autocore/files/index.htm
-@@ -720,6 +720,7 @@
- 		<tr><td width="33%"><%:Firmware Version%></td><td>
- 			<%=pcdata(ver.distname)%> <%=pcdata(ver.distversion)%> /
- 			<%=pcdata(ver.luciname)%> (<%=pcdata(ver.luciversion)%>)
- 		</td></tr>
- 		<tr><td width="33%"><%:Kernel Version%></td><td><%=unameinfo.release or "?"%></td></tr>
- 		<tr><td width="33%"><%:Local Time%></td><td id="localtime">-</td></tr>
 diff --git a/package/lean/autocore/files/sbin/cpuinfo b/package/lean/autocore/files/sbin/cpuinfo
 index 19ea5fb..60e7acd 100755
 --- a/package/lean/autocore/files/sbin/cpuinfo
