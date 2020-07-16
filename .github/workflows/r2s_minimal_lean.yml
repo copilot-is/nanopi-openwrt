@@ -33,10 +33,12 @@ jobs:
           curl https://raw.githubusercontent.com/friendlyarm/build-env-on-ubuntu-bionic/master/install.sh  | sed '/#/d' | sed 's/\\//g' | sed 's/exit 0//g' | sed 's/sudo apt -y install//g' | sed 's/sudo apt-get -y install//g' | sed 's/:i386//g' | xargs sudo apt-get -y --no-install-recommends install
           docker rmi `docker images -q`
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /usr/local/share/boost /opt/ghc
+      
       - name: Install Repo
         run: |
           git clone https://github.com/friendlyarm/repo
           sudo cp repo/repo /usr/bin/
+      
       - name: Init Source
         run: |
           mkdir friendlywrt-rk3328
@@ -44,9 +46,11 @@ jobs:
           repo init -u https://github.com/friendlyarm/friendlywrt_manifests -b master-v19.07.1 -m rk3328.xml --repo-url=https://github.com/friendlyarm/repo --no-clone-bundle --depth=1
           repo sync -c --no-tags --no-clone-bundle -j8
           cd friendlywrt/ && git fetch --unshallow
+
       - name: Patch Kernel
         run: |
           . patch_kernel_5.4.sh
+
       - name: Mods
         run: |
           cd friendlywrt-rk3328
@@ -192,6 +196,7 @@ jobs:
           sed -i 's/option fullcone\t1/option fullcone\t0/' package/network/config/firewall/files/firewall.config
           sed -i '/8.8.8.8/d' package/base-files/files/root/setup.sh
           mv ../../scripts/check_wan4.sh package/base-files/files/usr/bin && sed -i '/exit/i\/bin/sh /usr/bin/check_wan4.sh &' package/base-files/files/etc/rc.local
+
       - name: Add Passwall
         run: |
           cd friendlywrt-rk3328/friendlywrt
@@ -207,11 +212,13 @@ jobs:
           rm -rf package/lean/luci-app-pptp-server
           rm -rf package/lean/luci-app-v2ray-server
           ./scripts/feeds install -a
+
       - name: Build FriendlyWrt
         run: |
           cd friendlywrt-rk3328
           sed -i 's/set -eu/set -u/' scripts/mk-friendlywrt.sh
           ./build.sh nanopi_r2s.mk
+          
       - name: Zip Files
         run: |
           gzip friendlywrt-rk3328/out/*.img
