@@ -73,6 +73,7 @@ jobs:
           CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
           CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
           CONFIG_PACKAGE_luci-theme-bootstrap=y
+          CONFIG_PACKAGE_luci-app-flowoffload=y
           CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray=y
           CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=y
@@ -168,16 +169,24 @@ jobs:
           # CONFIG_PACKAGE_kmod-crypto-authenc is not set
           # CONFIG_PACKAGE_kmod-cryptodev is not set
           # CONFIG_PACKAGE_libopenssl-devcrypto is not set
-          # CONFIG_V2RAY_COMPRESS_UPX is not set
+          # CONFIG_V2RAY_COMPRESS_UPX is not 
+          # CONFIG_PACKAGE_luci-app-sfe is not set
           ' >> configs/config_rk3328
           cd friendlywrt
           git config --local user.email "action@github.com" && git config --local user.name "GitHub Action"
           git remote add upstream https://github.com/coolsnowwolf/lede && git fetch upstream
-          git rebase adc1a9a3676b8d7be1b48b5aed185a94d8e42728^ --onto upstream/master -X theirs
-          rm target/linux/rockchip-rk3328/patches-4.14/0001-net-thunderx-workaround-BGX-TX-Underflow-issue.patch
+          git checkout upstream/master -b tmp
+          git checkout 33f7cb735300bd9a099995236ed768c8925fec75 -- target/linux/sunxi/image/
+          git rm README.md
+          git commit -m 'reset'
+          git checkout origin/master-v19.07.1
+          git rebase adc1a9a3676b8d7be1b48b5aed185a94d8e42728^ --onto tmp -X theirs
+          #rm -rf package/kernel/mt76/Makefile package/network/services/hostapd package/kernel/mac80211
+          #git checkout 0a395d6fd6c38c554709197ae3cd6315f143cd7a -- package/kernel/mt76/Makefile package/network/services/hostapd package/kernel/mac80211
+          rm target/linux/rockchip-rk3328/patches-4.14/0001-net-thunderx-workaround-BGX-TX-Underflow-issue.patch target/linux/generic/hack-4.14/999-net-patch-linux-kernel-to-support-shortcut-fe.patch
           sed -i '/ipv6/,+3d' package/base-files/files/root/setup.sh
           git checkout upstream/master -- feeds.conf.default
-          sed -i '5s/#src-git/src-git/g' feeds.conf.default
+          sed -i -E 's/#(src-git.+)(helloworld.+)/\1\2/' feeds.conf.default
           git apply ../../enable_autocore.diff
           sed -i '/exit/i\find /etc/rc.d/ -name *docker* -delete' package/lean/default-settings/files/zzz-default-settings
           sed -i 's/option fullcone\t1/option fullcone\t0/' package/network/config/firewall/files/firewall.config
@@ -186,7 +195,7 @@ jobs:
       - name: Add Passwall
         run: |
           cd friendlywrt-rk3328/friendlywrt
-          echo -e '\nsrc-git lienol https://github.com/SuLingGG/openwrt-package' >> feeds.conf.default
+          echo -e '\nsrc-git lienol https://github.com/Lienol/openwrt-package' >> feeds.conf.default
           ./scripts/feeds update -a
           rm -rf feeds/lienol/lienol/ipt2socks
           rm -rf feeds/lienol/lienol/shadowsocksr-libev
@@ -213,6 +222,9 @@ jobs:
           mkdir -p ./artifact/
           mv friendlywrt-rk3328/out/*img* ./artifact/
           cp friendlywrt-rk3328/friendlywrt/.config ./artifact/
+          cd ./artifact/
+          md5sum *img* > md5sum.txt
+          cd ..
           zip -jr artifact.zip ./artifact/
           release_tag="nanopi-r2s-minimal-lean-$(date +%Y%m%d)"
           echo "##[set-output name=release_tag;]$release_tag"
