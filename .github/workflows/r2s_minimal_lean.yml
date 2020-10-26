@@ -23,235 +23,70 @@ jobs:
         with:
           ref: master
 
-      - name: Initialization Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo rm -rf /etc/apt/sources.list.d
-          sudo apt-get update
-          sudo apt-get -y --no-install-recommends install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch python3 unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs gcc-multilib g++-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler
-          curl https://raw.githubusercontent.com/friendlyarm/build-env-on-ubuntu-bionic/master/install.sh  | sed '/#/d' | sed 's/\\//g' | sed 's/exit 0//g' | sed 's/sudo apt -y install//g' | sed 's/sudo apt-get -y install//g' | sed 's/:i386//g' | xargs sudo apt-get -y --no-install-recommends install
-          docker rmi `docker images -q`
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /usr/local/share/boost /opt/ghc
-      
-      - name: Install Repo
-        run: |
-          git clone https://github.com/friendlyarm/repo
-          sudo cp repo/repo /usr/bin/
-      
-      - name: Init Source
-        run: |
-          mkdir friendlywrt-rk3328
-          cd friendlywrt-rk3328
-          repo init -u https://github.com/friendlyarm/friendlywrt_manifests -b master-v19.07.1 -m rk3328.xml --repo-url=https://github.com/friendlyarm/repo --no-clone-bundle --depth=1
-          repo sync -c --no-tags --no-clone-bundle -j8
-          cd friendlywrt/ && git fetch --unshallow
+        - name: Initialization Environment
+          env:
+            DEBIAN_FRONTEND: noninteractive
+          run: . 1_initialization_environment.sh
+  
+        - name: Clone Source
+          run: . 2_clone_source.sh master-v19.07.1 rk3328
+  
+        - name: Patch Kernel
+          run: . patch_kernel_5.4.sh
+  
+        - name: Mods
+          run: |
+            cd friendlywrt-rk3328
+            . ../remove_unused_config.sh
+            cat configs/config_rk3328 | grep "TARGET" >> ../base_rk3328.seed
+            cat ../minimal_config.seed >> ../base_rk3328.seed
+            cat ../base_rk3328.seed > configs/config_rk3328
+            cd friendlywrt
+            git remote add upstream https://github.com/coolsnowwolf/openwrt && git fetch upstream
+            git checkout upstream/lede-17.01 -b tmp
+            git rm README.md
+            git commit -m 'reset'
+            git checkout master-v19.07.1
+            git rebase adc1a9a3676b8d7be1b48b5aed185a94d8e42728^ --onto tmp -X theirs
+            rm -f target/linux/rockchip-rk3328/patches-4.14/0001-net-thunderx-workaround-BGX-TX-Underflow-issue.patch target/linux/generic/hack-4.14/999-net-patch-linux-kernel-to-support-shortcut-fe.patch
+            git checkout upstream/lede-17.01 -- feeds.conf.default && sed -i -E 's/#(src-git.+)(helloworld.+)/\1\2/' feeds.conf.default
+            curl 'https://git.openwrt.org/?p=openwrt/openwrt.git;a=patch;h=22378beb581b113def1dc392ef75306a2168a163' | git apply --reject - || true
+            . ../../3_prepare_packages.sh
+            . ../../add_passwall.sh
+            git apply ../../enable_autocore.diff
+            sed -i 's/@LINUX_5_4//' package/lean/luci-app-flowoffload/Makefile
+            . ../../5_mods.sh
+            mv ../../scripts/check_wan4.sh package/base-files/files/usr/bin && sed -i '/exit/i\/bin/sh /usr/bin/check_wan4.sh &' package/base-files/files/etc/rc.local
+            mv ../../scripts/autoupdate.sh package/base-files/files/root/au.sh && chmod +x package/base-files/files/root/au.sh
+        
+        - name: Build FriendlyWrt
+          run: . 4_build_image.sh friendlywrt-rk3328 nanopi_r2s.mk
+  
+        - name: Assemble Artifact
+          id: assemble_artifact
+          run: |
+            . x_assemble_artifact.sh
+            release_tag="R2S-Minimal-$(date +%Y-%m-%d)"
+            echo "##[set-output name=release_tag;]$release_tag"
 
-      - name: Patch Kernel
-        run: |
-          . patch_kernel_5.4.sh
+        - name: Create Release
+          id: create_release
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.sec_token }}
+          with:
+            tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}
+            release_name: 自动发布 ${{ steps.assemble_artifact.outputs.release_tag }}
+            draft: false
+            prerelease: false
 
-      - name: Mods
-        run: |
-          cd friendlywrt-rk3328
-          . ../remove_unused_config.sh
-          cat configs/config_rk3328 | grep "TARGET" >> ../base_rk3328.seed
-          cat ../base_rk3328.seed > configs/config_rk3328
-          echo '
-          CONFIG_PACKAGE_ipv6helper=y
-          CONFIG_PACKAGE_dnsmasq_full_dhcpv6=y
-          CONFIG_OPENSSL_ENGINE_BUILTIN=y
-          CONFIG_OPENSSL_WITH_DTLS=y
-          CONFIG_OPENSSL_WITH_EC2M=y
-          CONFIG_OPENSSL_WITH_NPN=y
-          CONFIG_PACKAGE_autocore=y
-          CONFIG_PACKAGE_htop=y
-          CONFIG_PACKAGE_diffutils=y
-          CONFIG_PACKAGE_vim-fuller=y
-          CONFIG_PACKAGE_pv=y
-          CONFIG_PACKAGE_pigz=y
-          CONFIG_PACKAGE_unzip=y
-          CONFIG_PACKAGE_losetup=y
-          CONFIG_LIBSODIUM_MINIMAL=y
-          CONFIG_PACKAGE_kmod-rtl8xxxu=y
-          CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
-          CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
-          CONFIG_PACKAGE_luci-theme-bootstrap=y
-          CONFIG_PACKAGE_luci-app-flowoffload=y
-          CONFIG_PACKAGE_luci-app-passwall=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_kcptun=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ipt2socks=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_dns2socks=y
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_haproxy is not set
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks is not set
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR is not set
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_socks is not set
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_socks is not set
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_v2ray-plugin is not set
-          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_simple-obfs is not set
-          # CONFIG_PACKAGE_luci-app-netdata is not set
-          # CONFIG_LUCI_LANG_zh-tw is not set
-          # CONFIG_PACKAGE_luci-theme-argon is not set
-          # CONFIG_PACKAGE_luci-i18n-base-zh-tw is not set
-          # CONFIG_PACKAGE_luci-i18n-firewall-zh-tw is not set
-          # CONFIG_PACKAGE_luci-app-wol is not set
-          # CONFIG_PACKAGE_luci-i18n-wol-en is not set
-          # CONFIG_PACKAGE_luci-i18n-wol-zh-cn is not set
-          # CONFIG_PACKAGE_luci-i18n-wol-zh-tw is not set
-          # CONFIG_PACKAGE_vlmcsd is not set
-          # CONFIG_PACKAGE_luci-app-vlmcsd is not set
-          # CONFIG_PACKAGE_luci-i18n-vlmcsd-zh-cn is not set
-          # CONFIG_PACKAGE_frpc is not set
-          # CONFIG_PACKAGE_frps is not set
-          # CONFIG_PACKAGE_luci-app-frpc is not set
-          # CONFIG_PACKAGE_luci-app-frps is not set
-          # CONFIG_PACKAGE_luci-app-ddns is not set
-          # CONFIG_PACKAGE_luci-i18n-ddns-en is not set
-          # CONFIG_PACKAGE_luci-i18n-ddns-zh-cn is not set
-          # CONFIG_PACKAGE_luci-i18n-ddns-zh-tw is not set
-          # CONFIG_PACKAGE_ddns-scripts is not set
-          # CONFIG_PACKAGE_ddns-scripts_aliyun is not set
-          # CONFIG_PACKAGE_ddns-scripts_cloudflare.com-v4 is not set
-          # CONFIG_PACKAGE_ddns-scripts_dnspod is not set
-          # CONFIG_PACKAGE_ddns-scripts_freedns_42_pl is not set
-          # CONFIG_PACKAGE_ddns-scripts_godaddy.com-v1 is not set
-          # CONFIG_PACKAGE_ddns-scripts_no-ip_com is not set
-          # CONFIG_PACKAGE_ddns-scripts_nsupdate is not set
-          # CONFIG_PACKAGE_ddns-scripts_route53-v1 is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_DNS2SOCKS is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Redsocks2 is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Simple_obfs is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Trojan is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_V2ray is not set
-          # CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_V2ray_plugin is not set
-          # CONFIG_PACKAGE_luci-app-ssrserver-python is not set
-          # CONFIG_PACKAGE_luci-app-unblockmusic is not set
-          # CONFIG_PACKAGE_luci-i18n-unblockmusic-zh-cn is not set
-          # CONFIG_UnblockNeteaseMusic_Go is not set
-          # CONFIG_UnblockNeteaseMusic_NodeJS is not set
-          # CONFIG_PACKAGE_luci-app-v2ray-server is not set
-          # CONFIG_PACKAGE_luci-app-vssr is not set
-          # CONFIG_PACKAGE_luci-theme-material is not set
-          # CONFIG_PACKAGE_luci-theme-netgear is not set
-          # CONFIG_PACKAGE_luci-app-uhttpd is not set
-          # CONFIG_PACKAGE_luci-i18n-uhttpd-zh-cn is not set
-          # CONFIG_PACKAGE_luci-app-upnp is not set
-          # CONFIG_PACKAGE_luci-i18n-upnp-en is not set
-          # CONFIG_PACKAGE_luci-i18n-upnp-zh-cn is not set
-          # CONFIG_PACKAGE_luci-i18n-upnp-zh-tw is not set
-          # CONFIG_PACKAGE_adbyby is not set
-          # CONFIG_PACKAGE_luci-app-adbyby-plus is not set
-          # CONFIG_PACKAGE_luci-i18n-adbyby-plus-zh-cn is not set
-          # CONFIG_PACKAGE_shadowsocksr-libev is not set
-          # CONFIG_PACKAGE_shadowsocksr-libev-alt is not set
-          # CONFIG_PACKAGE_shadowsocksr-libev-server is not set
-          # CONFIG_PACKAGE_shadowsocksr-libev-ssr-local is not set
-          # CONFIG_PACKAGE_luci-app-openclash is not set
-          # CONFIG_PACKAGE_zerotier is not set
-          # CONFIG_ZEROTIER_ENABLE_DEBUG is not set
-          # CONFIG_ZEROTIER_ENABLE_SELFTEST is not set
-          # CONFIG_PACKAGE_luci-app-zerotier is not set
-          # CONFIG_PACKAGE_luci-i18n-zerotier-zh-cn is not set
-          # CONFIG_PACKAGE_luci-app-accesscontrol is not set
-          # CONFIG_PACKAGE_luci-app-nlbwmon is not set
-          # CONFIG_PACKAGE_nlbwmon is not set
-          # CONFIG_PACKAGE_luci-app-pppoe-relay is not set
-          # CONFIG_PACKAGE_luci-app-pppoe-server is not set
-          # CONFIG_PACKAGE_luci-app-pptp-vpnserver-manyusers is not set
-          # CONFIG_PACKAGE_luci-app-sqm is not set
-          # CONFIG_PACKAGE_luci-app-ssr-python-pro-server is not set
-          # CONFIG_PACKAGE_luci-app-v2ray-server is not set
-          # CONFIG_PACKAGE_luci-app-vsftpd is not set
-          # CONFIG_PACKAGE_luci-app-vssr_INCLUDE_ShadowsocksR_Socks is not set
-          # CONFIG_TARGET_ROOTFS_TARGZ is not set
-          # CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO is not set
-          # CONFIG_PACKAGE_kmod-crypto-authenc is not set
-          # CONFIG_PACKAGE_kmod-cryptodev is not set
-          # CONFIG_PACKAGE_libopenssl-devcrypto is not set
-          # CONFIG_V2RAY_COMPRESS_UPX is not 
-          # CONFIG_PACKAGE_luci-app-sfe is not set
-          ' >> configs/config_rk3328
-          cd friendlywrt
-          git config --local user.email "action@github.com" && git config --local user.name "GitHub Action"
-          git remote add upstream https://github.com/coolsnowwolf/lede && git fetch upstream
-          git checkout upstream/master -b tmp
-          git checkout 33f7cb735300bd9a099995236ed768c8925fec75 -- target/linux/sunxi/image/
-          git rm README.md
-          git commit -m 'reset'
-          git checkout origin/master-v19.07.1
-          git rebase adc1a9a3676b8d7be1b48b5aed185a94d8e42728^ --onto tmp -X theirs
-          rm -rf package/kernel/mt76/Makefile package/network/services/hostapd package/kernel/mac80211
-          git checkout 0a395d6fd6c38c554709197ae3cd6315f143cd7a -- package/kernel/mt76/Makefile package/network/services/hostapd package/kernel/mac80211
-          rm target/linux/rockchip-rk3328/patches-4.14/0001-net-thunderx-workaround-BGX-TX-Underflow-issue.patch target/linux/generic/hack-4.14/999-net-patch-linux-kernel-to-support-shortcut-fe.patch
-          sed -i '/ipv6/,+3d' package/base-files/files/root/setup.sh
-          git checkout upstream/master -- feeds.conf.default
-          sed -i -E 's/#(src-git.+)(helloworld.+)/\1\2/' feeds.conf.default
-          git apply ../../enable_autocore.diff
-          sed -i '/exit/i\find /etc/rc.d/ -name *docker* -delete' package/lean/default-settings/files/zzz-default-settings
-          sed -i 's/option fullcone\t1/option fullcone\t0/' package/network/config/firewall/files/firewall.config
-          sed -i '/8.8.8.8/d' package/base-files/files/root/setup.sh
-          mv ../../scripts/check_wan4.sh package/base-files/files/usr/bin && sed -i '/exit/i\/bin/sh /usr/bin/check_wan4.sh &' package/base-files/files/etc/rc.local
-
-      - name: Add Passwall
-        run: |
-          cd friendlywrt-rk3328/friendlywrt
-          echo -e '\nsrc-git lienol https://github.com/Lienol/openwrt-package' >> feeds.conf.default
-          ./scripts/feeds update -a
-          rm -rf feeds/lienol/lienol/ipt2socks
-          rm -rf feeds/lienol/lienol/shadowsocksr-libev
-          rm -rf feeds/lienol/lienol/pdnsd-alt
-          rm -rf feeds/lienol/package/verysync
-          rm -rf feeds/lienol/lienol/luci-app-verysync
-          rm -rf package/lean/luci-app-kodexplorer
-          rm -rf package/lean/luci-app-pppoe-relay
-          rm -rf package/lean/luci-app-pptp-server
-          rm -rf package/lean/luci-app-v2ray-server
-          ./scripts/feeds install -a
-
-      - name: Build FriendlyWrt
-        run: |
-          cd friendlywrt-rk3328
-          sed -i 's/set -eu/set -u/' scripts/mk-friendlywrt.sh
-          ./build.sh nanopi_r2s.mk
-          
-      - name: Zip Files
-        run: |
-          gzip friendlywrt-rk3328/out/*.img
-      - name: Assemble Artifact
-        id: assemble_artifact
-        run: |
-          rm -rf ./artifact/
-          mkdir -p ./artifact/
-          mv friendlywrt-rk3328/out/*img* ./artifact/
-          cp friendlywrt-rk3328/friendlywrt/.config ./artifact/
-          cd ./artifact/
-          md5sum *img* > md5sum.txt
-          cd ..
-          zip -jr artifact.zip ./artifact/
-          release_tag="nanopi-r2s-minimal-lean-$(date +%Y%m%d)"
-          echo "##[set-output name=release_tag;]$release_tag"
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.sec_token }}
-        with:
-          tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}
-          release_name: ${{ steps.assemble_artifact.outputs.release_tag }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.sec_token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./artifact.zip
-          asset_name: ${{ steps.assemble_artifact.outputs.release_tag }}-ROM.zip
-          asset_content_type: application/zip
+        - name: Upload Release Asset
+          id: upload-release-asset
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.sec_token }}
+          with:
+            upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+            asset_path: ./artifact.zip
+            asset_name: ${{ steps.assemble_artifact.outputs.release_tag }}-ROM.zip
+            asset_content_type: application/zip
