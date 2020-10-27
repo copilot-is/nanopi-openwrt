@@ -1,6 +1,6 @@
 ./scripts/feeds update -a && ./scripts/feeds install -a
 rm -rf feeds/packages/libs/libcap && svn co https://github.com/openwrt/packages/trunk/libs/libcap feeds/packages/libs/libcap
-sed -i '/enable-jsonc/i\\t--disable-cloud \\' feeds/packages/admin/netdata/Makefile 
+#sed -i '/enable-jsonc/i\\t--disable-cloud \\' feeds/packages/admin/netdata/Makefile 
 
 cd package/lean/
 if [[ `pwd` == *"rk3328"* ]]; then
