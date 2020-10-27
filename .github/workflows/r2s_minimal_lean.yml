@@ -1,4 +1,4 @@
-name: nanopi r2s minimal lean
+name: nanopi r2s minimal
 
 on:
   push:
