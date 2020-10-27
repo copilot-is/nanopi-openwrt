@@ -10,9 +10,7 @@ on:
     - cron: '30 15 * * *'
 
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
     if: github.repository == 'jun0205/nanopi-openwrt'
 
