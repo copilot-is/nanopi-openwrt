@@ -15,6 +15,7 @@ jobs:
     if: github.repository == 'jun0205/nanopi-openwrt'
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@master
         with:
