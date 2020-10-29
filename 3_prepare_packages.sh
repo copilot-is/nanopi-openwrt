@@ -14,7 +14,7 @@ cd package/lean/
 # rm -rf luci-theme-infinityfreedom/ && git clone https://github.com/xiaoqingfengATGH/luci-theme-infinityfreedom
 rm -rf luci-app-chinadns-ng/ && git clone https://github.com/WuSiYu/luci-app-chinadns-ng
 rm -rf openwrt-chinadns-ng/ && git clone https://github.com/pexcn/openwrt-chinadns-ng
-sed -i 's/_("chinadns-ng")/_("ChinaDNS-NG")/g' luci-app-chinadns-ng/files/luci/controller/chinadns.lua
+sed -i 's/_("chinadns-ng")/_("ChinaDNS-NG")/g' luci-app-chinadns-ng/files/luci/controller/chinadns-ng.lua
 sed -i 's/translate("chinadns-ng")/translate("ChinaDNS-NG")/g' luci-app-chinadns-ng/files/luci/model/cbi/chinadns-ng.lua
 cd ../../
 
