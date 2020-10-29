@@ -2,7 +2,7 @@
 
 ### 关于
 
-此固件是在 [klever1988](https://github.com/klever1988/nanopi-openwrt) 的 minimal 版本上进一步精简。目前该固件只包含 [PassWall] 和 [Turbo ACC 网络加速] 两个插件。
+此固件是在 [klever1988](https://github.com/klever1988/nanopi-openwrt) 的 minimal 版本上进一步精简。目前该固件只包含 [PassWall]、[Turbo ACC 网络加速]、[OpenClash]、[ChinaDNS-NG] 插件。
 
 ### 发布地址：
 
@@ -15,8 +15,7 @@ https://github.com/jun0205/nanopi-openwrt/releases
 
 ### 温馨提示：
 
-Lean版的默认用户名是root, 密码是password  
-Lienol版默认用户名是root, 密码为空
+默认用户名是root, 密码是password
 
 烧制完固件插入tf卡并启动完成，电脑端显示“网络（已连接）”之后，在浏览器输入 http://friendlywrt/ 可以直接打开路由器后台，无需修改本地连接设置或者查看IP地址。如果网络状态一直是未识别（上电超过5分钟），请直接插拔一次电源重启试试。
 
