@@ -18,7 +18,7 @@ rm -rf openwrt-chinadns-ng/ && git clone https://github.com/pexcn/openwrt-chinad
 #rm -rf v2ray/ && mkdir v2ray && cd v2ray && wget https://github.com/coolsnowwolf/lede/raw/622af09a79af119f4f719a50988b5b314f723383/package/lean/v2ray/Makefile && cd ..
 #rm -rf v2ray-plugin/ && svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/v2ray-plugin
 #rm -rf trojan/ && svn co https://github.com/coolsnowwolf/lede/trunk/package/lean/trojan
-#rm -rf autocore/ && svn export https://github.com/coolsnowwolf/lede/trunk/package/lean/autocore
+rm -rf autocore/ && svn export https://github.com/coolsnowwolf/lede/trunk/package/lean/autocore
 sed -i 's/_("chinadns-ng")/_("ChinaDNS-NG")/g' luci-app-chinadns-ng/files/luci/controller/chinadns-ng.lua
 sed -i 's/translate("chinadns-ng")/translate("ChinaDNS-NG")/g' luci-app-chinadns-ng/files/luci/model/cbi/chinadns-ng.lua
 cd ../../
