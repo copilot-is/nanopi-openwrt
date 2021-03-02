@@ -2,7 +2,7 @@
 
 ### 关于
 
-此固件是在 [klever1988](https://github.com/klever1988/nanopi-openwrt) 的 minimal 版本上进一步精简。目前该固件只包含 [PassWall]、[Turbo ACC 网络加速]、[OpenClash]、[ChinaDNS-NG] 插件。
+此固件是在 [klever1988](https://github.com/klever1988/nanopi-openwrt) 的 minimal 版本上进一步精简。目前该固件只包含 [PassWall]、[Turbo ACC 网络加速]、[ChinaDNS-NG] 插件。
 
 ### 发布地址：
 
