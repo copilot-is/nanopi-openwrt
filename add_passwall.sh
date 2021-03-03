@@ -4,7 +4,7 @@ echo -e '\nsrc-git lienol https://github.com/xiaorouji/openwrt-passwall' >> feed
 rm -rf feeds/lienol/ipt2socks
 rm -rf feeds/lienol/shadowsocksr-libev
 rm -rf feeds/lienol/pdnsd-alt
-rm -rf feeds/lienol/chinadns-ng
+#rm -rf feeds/lienol/chinadns-ng
 #rm -rf package/lean/openwrt-chinadns-ng
 rm -rf package/lean/luci-app-kodexplorer
 rm -rf package/lean/luci-app-pppoe-relay
